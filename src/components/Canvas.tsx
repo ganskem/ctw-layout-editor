@@ -34,9 +34,14 @@ export default function Canvas({
   onSelectionChange,
 }: CanvasProps) {
   const [selectedNodeForEdge, setSelectedNodeForEdge] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   const nodeIdCounter = useRef(1);
   const edgeIdCounter = useRef(1);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   // Calculate canvas dimensions
   const gridSize = 50;
@@ -44,16 +49,92 @@ export default function Canvas({
   const canvasHeight = layout.teamSideHeight * gridSize;
   const middleX = (layout.teamSideWidth + layout.middleGapWidth / 2) * gridSize;
 
+  // Convert screen coordinates to SVG coordinates (accounting for zoom and pan)
+  const screenToSVG = useCallback(
+    (screenX: number, screenY: number) => {
+      const svg = svgRef.current;
+      if (!svg) return { x: screenX, y: screenY };
+
+      const rect = svg.getBoundingClientRect();
+      const x = (screenX - rect.left - pan.x) / zoom;
+      const y = (screenY - rect.top - pan.y) / zoom;
+      return { x, y };
+    },
+    [zoom, pan]
+  );
+
+  // Handle mouse wheel for zoom
+  const handleWheel = useCallback(
+    (event: React.WheelEvent<SVGSVGElement>) => {
+      event.preventDefault();
+      const delta = event.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.min(Math.max(0.1, zoom * delta), 5);
+
+      // Zoom towards mouse cursor
+      const svg = svgRef.current;
+      if (svg) {
+        const rect = svg.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        const newPan = {
+          x: mouseX - ((mouseX - pan.x) / zoom) * newZoom,
+          y: mouseY - ((mouseY - pan.y) / zoom) * newZoom,
+        };
+
+        setZoom(newZoom);
+        setPan(newPan);
+      }
+    },
+    [zoom, pan]
+  );
+
+  // Handle mouse down for panning (Shift + Left Click in any mode)
+  const handleMouseDown = useCallback(
+    (event: React.MouseEvent<SVGSVGElement>) => {
+      if (event.button === 0 && event.shiftKey) {
+        event.preventDefault();
+        setIsPanning(true);
+        setPanStart({ x: event.clientX - pan.x, y: event.clientY - pan.y });
+      }
+    },
+    [pan]
+  );
+
+  // Handle mouse move for panning
+  const handleMouseMove = useCallback(
+    (event: React.MouseEvent<SVGSVGElement>) => {
+      if (isPanning) {
+        setPan({
+          x: event.clientX - panStart.x,
+          y: event.clientY - panStart.y,
+        });
+      }
+    },
+    [isPanning, panStart]
+  );
+
+  // Handle mouse up to stop panning
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  // Reset view to default zoom and pan
+  const handleResetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
   // Handle canvas click
   const handleCanvasClick = useCallback(
     (event: React.MouseEvent<SVGSVGElement>) => {
-      const svg = event.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      const rawX = event.clientX - rect.left;
-      const rawY = event.clientY - rect.top;
+      // Don't process clicks if we were panning or shift is held
+      if (isPanning || event.shiftKey) return;
+
+      const coords = screenToSVG(event.clientX, event.clientY);
 
       // Snap to grid center
-      const snapped = snapToGridCenter({ x: rawX, y: rawY }, gridSize);
+      const snapped = snapToGridCenter(coords, gridSize);
 
       if (activeTool === Tool.ADD_NODE) {
         // Check if a node already exists at these coordinates
@@ -78,7 +159,7 @@ export default function Canvas({
         setSelectedNodeForEdge(null);
       }
     },
-    [activeTool, selectedNodeType, gridSize, nodes, onNodesChange, onSelectionChange]
+    [activeTool, selectedNodeType, gridSize, nodes, onNodesChange, onSelectionChange, isPanning, screenToSVG]
   );
 
   // Handle node click
@@ -285,48 +366,90 @@ export default function Canvas({
 
   return (
     <svg
+      ref={svgRef}
       width={canvasWidth}
       height={canvasHeight}
       style={{
         width: '100%',
         height: '100%',
-        cursor: activeTool === Tool.ADD_NODE ? 'crosshair' : 'default',
+        cursor: isPanning ? 'grabbing' : activeTool === Tool.ADD_NODE ? 'crosshair' : 'default',
       }}
       onClick={handleCanvasClick}
+      onWheel={handleWheel}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
     >
-      {/* Grid */}
-      {renderGrid()}
+      <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
+        {/* Grid */}
+        {renderGrid()}
 
-      {/* Middle line */}
-      <line
-        x1={middleX}
-        y1={0}
-        x2={middleX}
-        y2={canvasHeight}
-        stroke="#ef4444"
-        strokeWidth={2}
-        strokeDasharray="5,5"
-      />
+        {/* Middle line */}
+        <line
+          x1={middleX}
+          y1={0}
+          x2={middleX}
+          y2={canvasHeight}
+          stroke="#ef4444"
+          strokeWidth={2}
+          strokeDasharray="5,5"
+        />
 
-      {/* Edges (render first so they're behind nodes) */}
-      {edges.map(renderEdge)}
+        {/* Edges (render first so they're behind nodes) */}
+        {edges.map(renderEdge)}
 
-      {/* Nodes */}
-      {nodes.map(renderNode)}
+        {/* Nodes */}
+        {nodes.map(renderNode)}
 
-      {/* Helper text */}
-      {selectedNodeForEdge && (
-        <text
-          x={canvasWidth / 2}
-          y={20}
-          textAnchor="middle"
-          fill="#3b82f6"
-          fontSize={14}
-          fontWeight="bold"
-        >
-          Select second node to create edge
+        {/* Helper text */}
+        {selectedNodeForEdge && (
+          <text
+            x={canvasWidth / 2}
+            y={20}
+            textAnchor="middle"
+            fill="#3b82f6"
+            fontSize={14}
+            fontWeight="bold"
+          >
+            Select second node to create edge
+          </text>
+        )}
+      </g>
+
+      {/* Controls info - positioned outside the transform group */}
+      <g>
+        <rect
+          x={10}
+          y={10}
+          width={220}
+          height={80}
+          fill="white"
+          stroke="#d1d5db"
+          strokeWidth={1}
+          rx={4}
+          opacity={0.95}
+        />
+        <text x={20} y={30} fontSize={12} fill="#374151" fontWeight="bold">
+          Canvas Controls
         </text>
-      )}
+        <text x={20} y={48} fontSize={11} fill="#6b7280">
+          Mouse Wheel: Zoom in/out
+        </text>
+        <text x={20} y={64} fontSize={11} fill="#6b7280">
+          Shift + Drag: Pan canvas
+        </text>
+        <text
+          x={20}
+          y={80}
+          fontSize={11}
+          fill="#3b82f6"
+          style={{ cursor: 'pointer', textDecoration: 'underline' }}
+          onClick={handleResetView}
+        >
+          Click here to reset view
+        </text>
+      </g>
     </svg>
   );
 }
