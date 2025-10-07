@@ -17,3 +17,13 @@ body {
   height: 100vh;
   overflow: hidden;
 }
+
+/* Remove default ReactFlow node wrapper styles for custom nodes */
+.react-flow__node-spawn,
+.react-flow__node-wool,
+.react-flow__node-default {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}

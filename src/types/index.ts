@@ -54,6 +54,8 @@ export enum NodeType {
   SPAWN = 'SPAWN',
   /** Room containing wool objective */
   WOOL_ROOM = 'WOOL_ROOM',
+  /** Default/generic node */
+  DEFAULT = 'DEFAULT',
   /** Entry point to wool room */
   WOOL_ENTRY = 'WOOL_ENTRY',
   /** Entry point from spawn */
