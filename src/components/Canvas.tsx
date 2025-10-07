@@ -34,6 +34,7 @@ export default function Canvas({
   onSelectionChange,
 }: CanvasProps) {
   const [selectedNodeForEdge, setSelectedNodeForEdge] = useState<string | null>(null);
+  const [placementWarning, setPlacementWarning] =useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -137,6 +138,15 @@ export default function Canvas({
       const snapped = snapToGridCenter(coords, gridSize);
 
       if (activeTool === Tool.ADD_NODE) {
+        // Check if the node is added to the left side of the grid
+        const leftSideLimitX = (layout.teamSideWidth + (layout.middleGapWidth / 2)) * gridSize
+
+        if (snapped.x > leftSideLimitX) {
+          setPlacementWarning("Node placement restricted to the left team's area.")
+          setTimeout(() => setPlacementWarning(null), 3000)
+          return;
+        }
+
         // Check if a node already exists at these coordinates
         const nodeExists = nodes.some((node) => node.x === snapped.x && node.y === snapped.y);
 
@@ -413,6 +423,20 @@ export default function Canvas({
             fontWeight="bold"
           >
             Select second node to create edge
+          </text>
+        )}
+
+        {/* Node placement warning */}
+        {placementWarning && (
+          <text
+            x={canvasWidth / 2}
+            y={20}
+            textAnchor="middle"
+            fill="#dc2626"
+            fontSize={14}
+            fontWeight="bold"
+          >
+            {placementWarning}
           </text>
         )}
       </g>
