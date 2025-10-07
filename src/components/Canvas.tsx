@@ -246,15 +246,38 @@ export default function Canvas({
             const dy = endNode.y - startNode.y;
             const length = Math.sqrt(dx * dx + dy * dy);
 
+            const primaryIndex = edgeIdCounter.current++;
+            const primaryId = `edge-${primaryIndex}`;
+
             const newEdge: Edge = {
-              id: `edge-${edgeIdCounter.current++}`,
+              id: primaryId,
               startNodeId: selectedNodeForEdge,
               endNodeId: nodeId,
               team: Team.WHITE,
               type: EdgeType.WALKWAY,
               weight: Math.round(length / gridSize),
             };
-            onEdgesChange([...edges, newEdge]);
+
+            const mirroredIndex = edgeIdCounter.current++
+            const mirroredId = `edge-${mirroredIndex}`;
+            const mirroredStartNodeId = getMirroredNodeId(selectedNodeForEdge, nodes);
+            const mirroredEndNodeId = getMirroredNodeId(nodeId, nodes);
+            
+            if (mirroredStartNodeId && mirroredEndNodeId) {
+              const mirroredEdge: Edge = {
+                id: mirroredId,
+                startNodeId: mirroredStartNodeId,
+                endNodeId: mirroredEndNodeId,
+                team: Team.BLACK,
+                type: newEdge.type,
+                weight: newEdge.weight,
+                mirroredId: newEdge.id,
+              }
+
+              onEdgesChange([...edges, newEdge, mirroredEdge]);
+            } else {
+              onEdgesChange([...edges, newEdge]);
+            }           
           }
           setSelectedNodeForEdge(null);
         }
