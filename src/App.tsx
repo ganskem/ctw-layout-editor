@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import Toolbar from './components/Toolbar';
 import MapSettings from './components/MapSettings';
@@ -32,6 +32,10 @@ function App() {
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+   // Track temporary tool override with keyboard
+  const temporaryToolRef = useRef<Tool | null>(null);
+  const permanentToolRef = useRef<Tool>(Tool.SELECT);
+
   // Calculate canvas dimensions
   const canvasSize = calculateCanvasSize(layout, 50);
 
@@ -56,11 +60,70 @@ function App() {
         setEdges([]);
         setSelectedId(null);
         setActiveTool(Tool.SELECT);
+        permanentToolRef.current = tool;
       }
     } else {
       setActiveTool(tool);
+      permanentToolRef.current = tool;
     }
   };
+
+    // Keyboard shortcuts for temporary tool switching
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input field
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Map keys to tools
+      const keyToolMap: Record<string, Tool> = {
+        'v': Tool.SELECT,        // V for select (like in Adobe tools)
+        'n': Tool.ADD_NODE,      // N for node
+        'e': Tool.ADD_EDGE,      // E for edge
+        'r': Tool.RECTANGLE,     // R for rectangle
+        'f': Tool.FIND_PATH,     // F for find path
+        'd': Tool.DELETE,        // D for delete
+      };
+
+      const tool = keyToolMap[event.key.toLowerCase()];
+      if (tool && !temporaryToolRef.current) {
+        temporaryToolRef.current = tool;
+        setActiveTool(tool);
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input field
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      const keyToolMap: Record<string, Tool> = {
+        'v': Tool.SELECT,
+        'n': Tool.ADD_NODE,
+        'e': Tool.ADD_EDGE,
+        'r': Tool.RECTANGLE,
+        'f': Tool.FIND_PATH,
+        'd': Tool.DELETE,
+      };
+
+      const tool = keyToolMap[event.key.toLowerCase()];
+      if (tool && temporaryToolRef.current === tool) {
+        // Return to permanent tool
+        temporaryToolRef.current = null;
+        setActiveTool(permanentToolRef.current);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'auto', backgroundColor: '#f3f4f6' }}>

@@ -422,8 +422,8 @@ export default function Canvas({
         <rect
           x={10}
           y={10}
-          width={220}
-          height={80}
+          width={200}
+          height={145}
           fill="white"
           stroke="#d1d5db"
           strokeWidth={1}
@@ -439,9 +439,18 @@ export default function Canvas({
         <text x={20} y={64} fontSize={11} fill="#6b7280">
           Shift + Drag: Pan canvas
         </text>
+        <text x={20} y={85} fontSize={12} fill="#374151" fontWeight="bold">
+          Keyboard Shortcuts (Hold)
+        </text>
+        <text x={20} y={101} fontSize={10} fill="#6b7280">
+          V: Select  |  N: Add Node  |  E: Add Edge
+        </text>
+        <text x={20} y={115} fontSize={10} fill="#6b7280">
+          R: Rectangle  |  F: Find Path  |  D: Delete
+        </text>
         <text
           x={20}
-          y={80}
+          y={135}
           fontSize={11}
           fill="#3b82f6"
           style={{ cursor: 'pointer', textDecoration: 'underline' }}
