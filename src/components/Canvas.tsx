@@ -151,17 +151,37 @@ export default function Canvas({
         const nodeExists = nodes.some((node) => node.x === snapped.x && node.y === snapped.y);
 
         if (!nodeExists) {
+          const primaryIndex = nodeIdCounter.current++;
+          const primaryId = `node-${primaryIndex}`;
+
           // Create new node
           const newNode: Node = {
-            id: `node-${nodeIdCounter.current++}`,
+            id: primaryId,
             x: snapped.x,
             y: snapped.y,
             team: Team.WHITE,
             type: selectedNodeType,
-            name: `Node ${nodeIdCounter.current - 1}`,
+            name: `Node ${primaryIndex}`,
             isClassified: false,
           };
-          onNodesChange([...nodes, newNode]);
+
+          const distanceToCenter = middleX - snapped.x;
+          const mirroredX = middleX + distanceToCenter;
+
+          const mirroredIndex = nodeIdCounter.current++
+          const mirroredId = `node-${mirroredIndex}`;
+
+          const mirroredNode: Node = {
+            id: mirroredId,
+            x: mirroredX,
+            y: snapped.y,
+            team: Team.BLACK,
+            type: selectedNodeType,
+            name: `Node ${mirroredIndex}`,
+            isClassified: false,
+            mirroredId: primaryId,
+          };
+          onNodesChange([...nodes, newNode, mirroredNode]);
         }
       } else if (activeTool === Tool.SELECT) {
         // Deselect
