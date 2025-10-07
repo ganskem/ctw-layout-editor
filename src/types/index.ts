@@ -201,3 +201,8 @@ export interface Path {
   /** Total weight/cost of the path */
   totalWeight: number;
 }
+
+export interface Point {
+  x: number;
+  y: number;
+}

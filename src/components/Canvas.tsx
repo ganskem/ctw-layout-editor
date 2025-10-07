@@ -7,6 +7,7 @@ import {
   type MapLayout,
   type Node,
   type Edge,
+  type Point,
 } from '../types';
 import { snapToGridCenter } from '../utils';
 
@@ -34,6 +35,7 @@ export default function Canvas({
   onSelectionChange,
 }: CanvasProps) {
   const [selectedNodeForEdge, setSelectedNodeForEdge] = useState<string | null>(null);
+  const [selectedNodeForRectangle, setSelectedNodeForRectangle] = useState<string | null>(null);
   const [placementWarning, setPlacementWarning] =useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -70,6 +72,38 @@ export default function Canvas({
 
     const mirrored = edges.find(e => e.mirroredId === edgeId);
     return mirrored ? mirrored.id : null;
+  }
+
+  // Check if two nodes are collinear
+  function isAxisAligned(firstNodeId: string, secondNodeId: string, nodes: Node[]): boolean | null {
+    const first = nodes.find(n => n.id === firstNodeId);
+    const second = nodes.find(n => n.id === secondNodeId);
+    if (!first || !second) return null;
+
+    return (first.x === second.x) || (first.y === second.y);
+  }
+
+  // Check if a node is already at the given coordinate
+  const isNodeAtCoordinate = (x: number, y: number, nodes: Node[]) =>
+    nodes.some(n => n.x === x && n.y === y);
+
+  // Find the missing points to complete a rectangle
+  function getRectMissingCorners(firstNodeId: string, secondNodeId: string, nodes: Node[]): Point[] | null {
+    const first = nodes.find(n => n.id === firstNodeId);
+    const second = nodes.find(n => n.id === secondNodeId);
+    if (!first || !second) return null;
+
+    const firstPoint: Point = {
+      x: first.x,
+      y: second.y,
+    };
+
+    const secondPoint: Point = {
+      x: second.x,
+      y: first.y,
+    };
+
+    return [firstPoint, secondPoint]
   }
 
   // Convert screen coordinates to SVG coordinates (accounting for zoom and pan)
@@ -292,9 +326,64 @@ export default function Canvas({
           }
           setSelectedNodeForEdge(null);
         }
+      } else if (activeTool === Tool.RECTANGLE) {
+        if (!selectedNodeForRectangle) {
+          // First node selected
+          setSelectedNodeForRectangle(nodeId);
+        } else if (selectedNodeForRectangle === nodeId) {
+          // Deselect same node
+          setSelectedNodeForRectangle(null);
+        } else {
+          // Check if nodes are axis aligned
+          const shareAxis = isAxisAligned(selectedNodeForRectangle, nodeId, nodes);
+          if (shareAxis) {
+            return;
+          } else {
+            const missingPoints = getRectMissingCorners(selectedNodeForRectangle, nodeId, nodes);
+
+            if (missingPoints) {
+              const [p3, p4] = missingPoints;
+              const additions: Node[] = [];
+
+              // Create the third corner of rectangle
+              if (!isNodeAtCoordinate(p3.x, p3.y, nodes)) {
+                const id = `node-${nodeIdCounter.current++}`;
+                additions.push({
+                  id,
+                  x: p3.x,
+                  y: p3.y,
+                  team: Team.WHITE,
+                  type: selectedNodeType,
+                  name: `Node ${id.split('-')[1]}`,
+                  isClassified: false,
+                });
+              }
+
+              // Create fourth corner of the rectangle
+              if (!isNodeAtCoordinate(p4.x, p4.y, nodes)) {
+                const id = `node-${nodeIdCounter.current++}`;
+                additions.push({
+                  id,
+                  x: p4.x,
+                  y: p4.y,
+                  team: Team.BLACK,
+                  type: selectedNodeType,
+                  name: `Node ${id.split('-')[1]}`,
+                  isClassified: false,
+                });
+              }
+
+              // Only update state if there’s something to add
+              if (additions.length) {
+                onNodesChange([...nodes, ...additions]);
+              } 
+            }
+          }
+          setSelectedNodeForRectangle(null);
+        }        
       }
     },
-    [activeTool, selectedNodeForEdge, nodes, edges, gridSize, onNodesChange, onEdgesChange, onSelectionChange]
+    [activeTool, selectedNodeForEdge, selectedNodeForRectangle, nodes, edges, gridSize, onNodesChange, onEdgesChange, onSelectionChange]
   );
 
   // Handle edge click
