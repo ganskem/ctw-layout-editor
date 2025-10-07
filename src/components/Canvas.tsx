@@ -64,6 +64,17 @@ export default function Canvas({
     [zoom, pan]
   );
 
+  // Find the counterpart of a node in a mirrored pair
+  function getMirroredNodeId(nodeId: string, nodes: Node[]): string | null {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return null;
+
+    if (node.mirroredId) return node.mirroredId;
+
+    const mirrored = nodes.find(n => n.mirroredId === nodeId);
+    return mirrored ? mirrored.id : null;
+  }
+  
   // Handle mouse wheel for zoom
   const handleWheel = useCallback(
     (event: React.WheelEvent<SVGSVGElement>) => {
@@ -200,9 +211,24 @@ export default function Canvas({
       if (activeTool === Tool.SELECT) {
         onSelectionChange(nodeId);
       } else if (activeTool === Tool.DELETE) {
-        // Delete node and connected edges
-        onNodesChange(nodes.filter((n) => n.id !== nodeId));
-        onEdgesChange(edges.filter((e) => e.startNodeId !== nodeId && e.endNodeId !== nodeId));
+        const counterpartId = getMirroredNodeId(nodeId, nodes);
+
+        const toDelete = new Set<string>([nodeId]);
+        if (counterpartId) toDelete.add(counterpartId);
+
+        const remainingNodes = nodes.filter(n => !toDelete.has(n.id));
+        const remainingEdges = edges.filter(
+          e => !toDelete.has(e.startNodeId) && !toDelete.has(e.endNodeId)
+        );
+
+        onNodesChange(remainingNodes);
+        onEdgesChange(remainingEdges);
+
+        // Clear selection if it referenced a deleted element
+        if (selectedId && (toDelete.has(selectedId) ||
+            edges.some(e => e.id === selectedId) && !remainingEdges.some(e => e.id === selectedId))) {
+          onSelectionChange(null);
+        }
       } else if (activeTool === Tool.ADD_EDGE) {
         if (!selectedNodeForEdge) {
           // First node selected
