@@ -50,6 +50,28 @@ export default function Canvas({
   const canvasHeight = layout.teamSideHeight * gridSize;
   const middleX = (layout.teamSideWidth + layout.middleGapWidth / 2) * gridSize;
 
+  // Find the counterpart of a node in a mirrored pair
+  function getMirroredNodeId(nodeId: string, nodes: Node[]): string | null {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return null;
+
+    if (node.mirroredId) return node.mirroredId;
+
+    const mirrored = nodes.find(n => n.mirroredId === nodeId);
+    return mirrored ? mirrored.id : null;
+  }
+
+  // Find the counterpart of a node in a mirrored pair
+  function getMirroredEdgeId(edgeId: string, edges: Edge[]): string | null {
+    const edge = edges.find(n => n.id === edgeId);
+    if (!edge) return null;
+
+    if (edge.mirroredId) return edge.mirroredId;
+
+    const mirrored = edges.find(e => e.mirroredId === edgeId);
+    return mirrored ? mirrored.id : null;
+  }
+
   // Convert screen coordinates to SVG coordinates (accounting for zoom and pan)
   const screenToSVG = useCallback(
     (screenX: number, screenY: number) => {
@@ -63,17 +85,6 @@ export default function Canvas({
     },
     [zoom, pan]
   );
-
-  // Find the counterpart of a node in a mirrored pair
-  function getMirroredNodeId(nodeId: string, nodes: Node[]): string | null {
-    const node = nodes.find(n => n.id === nodeId);
-    if (!node) return null;
-
-    if (node.mirroredId) return node.mirroredId;
-
-    const mirrored = nodes.find(n => n.mirroredId === nodeId);
-    return mirrored ? mirrored.id : null;
-  }
   
   // Handle mouse wheel for zoom
   const handleWheel = useCallback(
@@ -294,10 +305,20 @@ export default function Canvas({
       if (activeTool === Tool.SELECT) {
         onSelectionChange(edgeId);
       } else if (activeTool === Tool.DELETE) {
-        onEdgesChange(edges.filter((e) => e.id !== edgeId));
+        const counterpartId = getMirroredEdgeId(edgeId, edges);
+
+        const toDelete = new Set<string>([edgeId]);
+        if (counterpartId) toDelete.add(counterpartId);
+
+        const remainingEdges = edges.filter(e => !toDelete.has(e.id));
+        onEdgesChange(remainingEdges)
+
+        if (selectedId && toDelete.has(selectedId)) {
+          onSelectionChange(null);
+        }
       }
     },
-    [activeTool, edges, onEdgesChange, onSelectionChange]
+    [activeTool, edges, selectedId, onEdgesChange, onSelectionChange]
   );
 
   // Render grid
