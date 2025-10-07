@@ -142,10 +142,32 @@ export default function Canvas({
 
   // Render grid
   const renderGrid = () => {
-    const lines = [];
+    const elements = [];
+
+    // Calculate middle gap boundaries
+    const middleGapStartX = layout.teamSideWidth * gridSize;
+    const middleGapEndX = (layout.teamSideWidth + layout.middleGapWidth) * gridSize;
+
+    // Render middle gap background cells
+    for (let x = middleGapStartX; x < middleGapEndX; x += gridSize) {
+      for (let y = 0; y < canvasHeight; y += gridSize) {
+        elements.push(
+          <rect
+            key={`gap-${x}-${y}`}
+            x={x}
+            y={y}
+            width={gridSize}
+            height={gridSize}
+            fill="#fee2e2"
+            stroke="none"
+          />
+        );
+      }
+    }
+
     // Vertical lines
     for (let x = 0; x <= canvasWidth; x += gridSize) {
-      lines.push(
+      elements.push(
         <line
           key={`v-${x}`}
           x1={x}
@@ -159,7 +181,7 @@ export default function Canvas({
     }
     // Horizontal lines
     for (let y = 0; y <= canvasHeight; y += gridSize) {
-      lines.push(
+      elements.push(
         <line
           key={`h-${y}`}
           x1={0}
@@ -171,7 +193,7 @@ export default function Canvas({
         />
       );
     }
-    return lines;
+    return elements;
   };
 
   // Render node
